@@ -1,35 +1,60 @@
-from bs4 import BeautifulSoup
-from dom_node import DomNode
+from bs4 import BeautifulSoup, NavigableString, Tag
 
-def parse_html(html: str) -> DomNode:
-  soup = BeautifulSoup(html, "html.parser")
-  return _convert_elemnt(soup.html)
+from src.dom_node import DOMNode
 
-def _convert_elemnt(element) -> DomNode:
-    node = DomNode(
-        tag=element.name,
+
+def parse_html(html: str) -> DOMNode:
+    """
+    Parse raw HTML and convert it into our own DOMNode tree.
+
+    The returned root is always a DOMNode. For a normal webpage,
+    its first meaningful child will usually be the <html> element.
+    """
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    root = DOMNode(tag="document")
+
+    for child in soup.children:
+        if isinstance(child, Tag):
+            root.add_child(_convert_element(child))
+
+    return root
+
+
+def _convert_element(element: Tag) -> DOMNode:
+    """
+    Convert one BeautifulSoup Tag into a DOMNode and recursively
+    convert all of its element children.
+    """
+
+    node = DOMNode(
+        tag=element.name or "unknown",
         text=_get_direct_text(element),
-        attributes=element.attrs
+        attributes=dict(element.attrs),
     )
-    
-    for child in element.children:
 
-       if not getattr(child, "name", None):
-          continue
-       child_node = _convert_elemnt(child)
-       child_node.parent = node
-       node.children.append(child_node)
+    for child in element.children:
+        if isinstance(child, Tag):
+            node.add_child(_convert_element(child))
 
     return node
 
-def _get_direct_text(element) -> str:
-    return "".join(
-       text.strip()
-       for text in element.findall(
-          string=True,
-          recursive=False
-       )
-       if text.strip
-    ) 
-    
-    
+
+def _get_direct_text(element: Tag) -> str:
+    """
+    Return only text directly belonging to this element.
+
+    Text inside nested child elements is not included.
+    """
+
+    parts: list[str] = []
+
+    for child in element.children:
+        if isinstance(child, NavigableString):
+            text = str(child).strip()
+
+            if text:
+                parts.append(text)
+
+    return " ".join(parts)
