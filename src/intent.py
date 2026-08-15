@@ -5,7 +5,7 @@ from datetime import date
 from typing import Optional
 
 
-@dataclass # we store structured data 
+@dataclass
 class ScrapeIntent:
     """
     Structured representation of what the user asked for, in plain language.
@@ -17,6 +17,7 @@ class ScrapeIntent:
 
     target_type: str = "generic"          # "news", "listing", "generic"
     keywords: list[str] = field(default_factory=list)   # must appear in item text
+    category: Optional[str] = None        # "humor" — a genre/category to navigate to, not filter by
     location: Optional[str] = None        # "town A" — soft signal, boosts scoring, never excludes
     date_filter: Optional[date] = None    # resolved from "yesterday" / "today" / explicit date
     limit: Optional[int] = None           # "last 5"
@@ -27,6 +28,8 @@ class ScrapeIntent:
         parts = [f"target_type={self.target_type!r}"]
         if self.keywords:
             parts.append(f"keywords={self.keywords!r}")
+        if self.category:
+            parts.append(f"category={self.category!r}")
         if self.location:
             parts.append(f"location={self.location!r}")
         if self.date_filter:
