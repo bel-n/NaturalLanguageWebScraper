@@ -21,6 +21,7 @@ def parse_intent(text: str) -> ScrapeIntent:
     _apply_limit(lower, intent)
     _apply_date(lower, intent)
     _apply_keywords(lower, intent)
+    _apply_category(lower, intent)
     _apply_location(text, intent)
     _apply_fields(lower, intent)
     _apply_format(lower, intent)
@@ -56,6 +57,22 @@ def _apply_keywords(lower: str, intent: ScrapeIntent) -> None:
 
 
 _LOCATION_STOPWORDS = {"csv", "json", "format", "and", "with"}
+
+
+def _apply_category(lower: str, intent: ScrapeIntent) -> None:
+    # "genre humor" / "category humor" / "under the genre of humor" — this
+    # names a SECTION of the site to navigate to, not text to search for.
+    # Keep it separate from _apply_keywords: the word "humor" will never
+    # appear inside a book's own listing text, so treating it as a keyword
+    # filter would always match zero items instead of visiting the page
+    # where the right items actually live.
+    m = re.search(
+        r"\b(?:genre|category|section)s?\s+(?:of\s+)?"
+        r"([a-z][a-z\- ]*?)(?=[,.]|\s+and\b|\s+with\b|\s+in\b|\s+for\b|\s+as\b|$)",
+        lower,
+    )
+    if m:
+        intent.category = m.group(1).strip()
 
 
 def _apply_location(original_text: str, intent: ScrapeIntent) -> None:
