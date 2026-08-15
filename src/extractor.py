@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import re
+
 from bs4 import BeautifulSoup
 
 from src.dom_node import DOMNode
 from src.dom_utils import collect_text, looks_like_headline
+
+_CURRENCY_RE = re.compile(r"[£$€]\s?\d+(?:[.,]\d{2})?")
 
 
 def extract_by_selectors(html: str, selector_map: dict[str, str]) -> list[dict]:
@@ -55,6 +59,12 @@ def extract_fields(item: DOMNode, fields: list[str]) -> dict:
             result["link"] = _guess_link(item)
         elif field_name == "date":
             result["date"] = _guess_date_text(item)
+        elif field_name == "price":
+            result["price"] = _guess_price(item)
+        elif field_name == "author":
+            result["author"] = _guess_author(item)
+        elif field_name == "tags":
+            result["tags"] = _guess_tags(item)
         else:
             # price / address / anything else without a dedicated guesser
             # yet: fall back to full text so nothing is silently dropped.
@@ -78,12 +88,46 @@ def _guess_link(item: DOMNode) -> str:
     return ""
 
 
+def _guess_price(item: DOMNode) -> str:
+    # Prefer a node whose class actually says "price" — more reliable
+    # than the first currency-looking text in the subtree.
+    for node in _flatten(item):
+        classes = " ".join(node.attributes.get("class", [])).lower()
+        if "price" in classes and node.text:
+            if m := _CURRENCY_RE.search(node.text):
+                return m.group(0)
+            return node.text
+
+    for node in _flatten(item):
+        if node.text and (m := _CURRENCY_RE.search(node.text)):
+            return m.group(0)
+
+    return ""
+
+
 def _guess_date_text(item: DOMNode) -> str:
     for node in _flatten(item):
         classes = " ".join(node.attributes.get("class", [])).lower()
         if "date" in classes or node.tag == "time":
             return node.text or node.attributes.get("datetime", "")
     return ""
+
+
+def _guess_author(item: DOMNode) -> str:
+    for node in _flatten(item):
+        classes = " ".join(node.attributes.get("class", [])).lower()
+        if "author" in classes and node.text:
+            return node.text
+    return ""
+
+
+def _guess_tags(item: DOMNode) -> str:
+    tags = [
+        node.text for node in _flatten(item)
+        if node.tag == "a" and node.text
+        and "tag" in " ".join(node.attributes.get("class", [])).lower()
+    ]
+    return ", ".join(tags)
 
 
 def _flatten(node: DOMNode):

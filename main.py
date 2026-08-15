@@ -4,7 +4,11 @@ from src.extractor import extract_by_selectors, extract_fields
 from src.exporter import export
 from src.fetcher import fetch_page
 from src.intent_parser import parse_intent
+from src.navigator import find_category_link
+from src.paginator import find_next_link
 from src.parser import parse_html
+
+MAX_PAGES = 20  # safety cap so a bad "next" match can't crawl forever
 
 
 def main() -> None:
@@ -23,7 +27,7 @@ def main() -> None:
     if knows_selectors == "y":
         results, fmt = _run_selector_path(html)
     else:
-        results, fmt = _run_intent_path(html)
+        results, fmt = _run_intent_path(html, url)
 
     if not results:
         print("\nNo matching items found.")
@@ -54,7 +58,7 @@ def _run_selector_path(html: str) -> tuple[list[dict], str]:
     return results, fmt
 
 
-def _run_intent_path(html: str) -> tuple[list[dict], str]:
+def _run_intent_path(html: str, url: str) -> tuple[list[dict], str]:
     query = input(
         "\nDescribe what you want "
         "(e.g. 'last 5 news from yesterday mentioning catastrophe, titles only'): "
@@ -63,16 +67,46 @@ def _run_intent_path(html: str) -> tuple[list[dict], str]:
     intent = parse_intent(query)
     print(f"\nParsed intent: {intent}")
 
-    root = parse_html(html)
-    groups = find_candidate_groups(root)
-    print(f"Found {len(groups)} candidate repeating group(s) on the page.")
+    if intent.category:
+        target_url = find_category_link(html, url, intent.category)
+        if target_url:
+            print(f"Found a '{intent.category}' section — visiting {target_url}")
+            url = target_url
+            html = fetch_page(url)
+        else:
+            print(
+                f"Couldn't find a '{intent.category}' link on this page — "
+                "scraping the page as given instead."
+            )
 
-    best_group = pick_best_group(groups, intent)
-    if not best_group:
-        return [], intent.output_format
+    all_items = []
+    current_html, current_url = html, url
 
-    items = filter_items(best_group, intent)
-    results = [extract_fields(item, intent.fields) for item in items]
+    for page_num in range(1, MAX_PAGES + 1):
+        root = parse_html(current_html)
+        groups = find_candidate_groups(root)
+        best_group = pick_best_group(groups, intent)
+
+        if best_group:
+            all_items.extend(filter_items(best_group, intent))
+
+        have_enough = intent.limit is not None and len(all_items) >= intent.limit
+        if have_enough:
+            break
+
+        next_url = find_next_link(current_html, current_url)
+        if not next_url:
+            break
+
+        print(f"Page {page_num} done ({len(all_items)} matching so far) — "
+              f"fetching next page...")
+        current_html = fetch_page(next_url)
+        current_url = next_url
+
+    if intent.limit:
+        all_items = all_items[: intent.limit]
+
+    results = [extract_fields(item, intent.fields) for item in all_items]
     return results, intent.output_format
 
 
