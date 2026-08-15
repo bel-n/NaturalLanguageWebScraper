@@ -3,6 +3,7 @@ from __future__ import annotations
 from src.dom_node import DOMNode
 from src.dom_utils import collect_text, date_in_text, looks_like_headline
 from src.intent import ScrapeIntent
+from src.nav_detection import has_price_pattern, is_in_navigation
 
 
 def pick_best_group(groups: list[list[DOMNode]], intent: ScrapeIntent) -> list[DOMNode] | None:
@@ -33,7 +34,20 @@ def score_group(group: list[DOMNode], intent: ScrapeIntent) -> float:
     per_item_scores = [_score_item(item, intent) for item in group]
     avg = sum(per_item_scores) / len(per_item_scores)
     size_bonus = min(len(group), 10) / 10 * 0.2
-    return avg + size_bonus
+
+    # A sidebar/menu list is structurally identical to a content list
+    # (both are repeating <a>/<li> groups) — nothing above tells them
+    # apart, so we penalize anything that lives inside nav-shaped markup.
+    sample = group[: min(len(group), 5)]
+    nav_penalty = -1.5 if any(is_in_navigation(item) for item in sample) else 0.0
+
+    # If the user wants a price, a group whose items actually contain
+    # currency-like text is almost certainly the right one.
+    price_bonus = 0.0
+    if "price" in intent.fields and any(has_price_pattern(collect_text(i)) for i in sample):
+        price_bonus = 0.3
+
+    return avg + size_bonus + nav_penalty + price_bonus
 
 
 def _score_item(node: DOMNode, intent: ScrapeIntent) -> float:
@@ -63,6 +77,12 @@ def _flatten(node: DOMNode):
 
 
 def filter_items(group: list[DOMNode], intent: ScrapeIntent) -> list[DOMNode]:
+    """
+    Applies keyword/date filtering only. Deliberately does NOT apply
+    intent.limit — with pagination, "last 5" has to be enforced once
+    across ALL pages combined, not 5-per-page. See main.py.
+    """
+
     items = group
 
     if intent.keywords:
@@ -76,8 +96,5 @@ def filter_items(group: list[DOMNode], intent: ScrapeIntent) -> list[DOMNode]:
             item for item in items
             if date_in_text(collect_text(item).lower(), intent.date_filter)
         ]
-
-    if intent.limit:
-        items = items[: intent.limit]
 
     return items

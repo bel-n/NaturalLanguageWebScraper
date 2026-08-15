@@ -33,6 +33,14 @@ def parse_intent(text: str) -> ScrapeIntent:
 def _apply_limit(lower: str, intent: ScrapeIntent) -> None:
     if m := re.search(r"\b(?:last|first|top)\s+(\d+)\b", lower):
         intent.limit = int(m.group(1))
+        return
+    # Fallback: a bare count with no last/first/top ("give me the 5
+    # quotes", "5 books"). Riskier — a number could mean something else
+    # ("2026 results") — so it only fires when last/first/top didn't
+    # already match, and only when immediately followed by a word (a
+    # plural noun is the common case for "how many of these").
+    if m := re.search(r"\b(\d+)\s+[a-z]+", lower):
+        intent.limit = int(m.group(1))
 
 
 def _apply_date(lower: str, intent: ScrapeIntent) -> None:
@@ -98,6 +106,8 @@ def _apply_fields(lower: str, intent: ScrapeIntent) -> None:
         "address": ("address", "addresses", "location"),
         "link": ("link", "links", "url", "urls"),
         "date": ("date", "dates", "published"),
+        "author": ("author", "authors"),
+        "tags": ("tag", "tags"),
     }
     for field_name, triggers in field_map.items():
         if any(re.search(rf"\b{t}\b", lower) for t in triggers):
