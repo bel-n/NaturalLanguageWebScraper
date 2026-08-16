@@ -6,13 +6,30 @@ from src.intent import ScrapeIntent
 from src.nav_detection import has_price_pattern, is_in_navigation
 
 
-def pick_best_group(groups: list[list[DOMNode]], intent: ScrapeIntent) -> list[DOMNode] | None:
-    if not groups:
-        return None
+def _scored_groups(groups: list[list[DOMNode]], intent: ScrapeIntent) -> list[tuple[float, list[DOMNode]]]:
     scored = [(score_group(group, intent), group) for group in groups]
     scored.sort(key=lambda pair: pair[0], reverse=True)
+    return scored
+
+
+def rank_groups(groups: list[list[DOMNode]], intent: ScrapeIntent) -> list[list[DOMNode]]:
+    """
+    All candidate groups, best-scoring first. This is what the preview
+    loop walks through when the user says the first guess was wrong —
+    same ranking pick_best_group uses, just not stopping at #1.
+    """
+
+    return [group for _, group in _scored_groups(groups, intent)]
+
+
+def pick_best_group(groups: list[list[DOMNode]], intent: ScrapeIntent) -> list[DOMNode] | None:
+    scored = _scored_groups(groups, intent)
+    if not scored:
+        return None
     best_score, best_group = scored[0]
-    return best_group if best_score > 0 or not (intent.keywords or intent.date_filter) else _best_nonzero(scored)
+    if best_score > 0 or not (intent.keywords or intent.date_filter):
+        return best_group
+    return _best_nonzero(scored)
 
 
 def _best_nonzero(scored: list[tuple[float, list[DOMNode]]]) -> list[DOMNode] | None:
@@ -47,7 +64,15 @@ def score_group(group: list[DOMNode], intent: ScrapeIntent) -> float:
     if "price" in intent.fields and any(has_price_pattern(collect_text(i)) for i in sample):
         price_bonus = 0.3
 
-    return avg + size_bonus + nav_penalty + price_bonus
+    # Content vs. a list of link labels ("Top Ten tags", a nav menu) —
+    # actual content (a quote, an article, a product card) tends to
+    # carry far more text per item than a bare list of short labels.
+    # This is what stops a same-sized tag cloud from outscoring the
+    # real list just because it happens to have more/equal items.
+    avg_text_len = sum(len(collect_text(item)) for item in sample) / len(sample)
+    richness_bonus = min(avg_text_len / 150, 1.0) * 0.4
+
+    return avg + size_bonus + nav_penalty + price_bonus + richness_bonus
 
 
 def _score_item(node: DOMNode, intent: ScrapeIntent) -> float:
