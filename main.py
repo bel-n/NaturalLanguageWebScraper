@@ -9,6 +9,7 @@ from src.intent_parser import parse_intent
 from src.navigator import find_category_link
 from src.paginator import find_next_link
 from src.parser import parse_html
+from src.dom_preview import find_matches_by_content_type, format_preview
 
 MAX_PAGES = 20  # safety cap so a bad "next" match can't crawl forever
 PREVIEW_SIZE = 3
@@ -67,8 +68,15 @@ def _run_intent_path(html: str, url: str) -> tuple[list[dict], str]:
 
     while True:
         page_html, page_url = _navigate_to_category(html, url, intent)
-
         root = parse_html(page_html)
+
+        if not _dom_content_preview_and_confirm(root, intent):
+            refined = _refine_intent_from_feedback(intent)
+            if refined is None:
+                return [], intent.output_format
+            intent = refined
+            continue  # re-navigate with the refined intent — it might change which page we land on
+
         groups = find_candidate_groups(root)
         ranked = rank_groups(groups, intent)
 
@@ -130,11 +138,7 @@ def _navigate_to_category(html: str, url: str, intent: ScrapeIntent) -> tuple[st
 
 
 def _preview_and_confirm(ranked: list, intent: ScrapeIntent):
-    """
-    Walks the ranked candidate groups, showing a small preview of each
-    and asking the user to confirm, before anything gets exported.
-    Returns the confirmed group, or None if the user rejected all of them.
-    """
+
 
     for i, candidate in enumerate(ranked, start=1):
         preview_items = filter_items(candidate, intent)[:PREVIEW_SIZE]
@@ -149,6 +153,41 @@ def _preview_and_confirm(ranked: list, intent: ScrapeIntent):
             return candidate
 
     return None
+
+def _dom_content_preview_and_confirm(root, intent) -> bool:
+    print()
+    print(format_preview(find_matches_by_content_type(root, intent)))
+    print()
+    return input("Does this look like what you need? (y/n):").strip().lower() == "y"
+
+def _refine_intent_from_feedback(intent):
+    feedback = input(
+        "\nWhat's missing or wrong? Describe it in a sentence (blank to give up): "
+    ).strip()
+    if not feedback:
+        return None
+
+    parsed = parse_intent(feedback)
+    for kw in parsed.keywords:
+        if kw not in intent.keywords:
+            intent.keywords.append(kw)
+    for f in parsed.fields:
+        if f not in intent.fields:
+            intent.fields.append(f)
+    if parsed.category:
+        intent.category = parsed.category
+    if parsed.location:
+        intent.location = parsed.location
+    if parsed.date_filter:
+        intent.date_filter = parsed.date_filter
+    if parsed.limit is not None:
+        intent.limit = parsed.limit
+    if parsed.target_type != "generic":
+        intent.target_type = parsed.target_type
+    if "csv" in feedback.lower() or "json" in feedback.lower():
+        intent.output_format = parsed.output_format
+
+    return intent
 
 
 def _follow_pagination(
