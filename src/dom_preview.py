@@ -71,3 +71,41 @@ def _matches_keywords(text: str, intent: ScrapeIntent) -> bool:
 
 def _clean(text: str) -> str:
     return " ".join(text.split())
+
+
+def format_preview(buckets: dict[str, list["PreviewMatch"]], max_per_type: int = 5) -> str:
+
+    non_empty = {ctype: matches for ctype, matches in buckets.items() if matches}
+
+    if not non_empty:
+        return "We didn't find any matches"
+
+    counts = ", ".join(
+        f"{len(matches)} {_pluralize(ctype, len(matches))}"
+        for ctype, matches in non_empty.items()
+    )
+    lines = [f"We found {counts}:matching your request.\n"]
+
+    
+    for ctype, matches in non_empty.items():
+        lines.append(f"{ctype.replace('_', ' ').title()}s:")
+        shown = matches[:max_per_type]
+        for i, match in enumerate(shown, start=1):
+            text = match.text if len(match.text) <= 120 else match.text[:117] + "..."
+            if match.content_type == "link" and match.href:
+                lines.append(f'  {i}. [{match.path}] "{text}" -> {match.href}')
+            else:
+                lines.append(f'  {i}. [{match.path}] "{text}"')
+        remaining = len(matches) - len(shown)
+        if remaining > 0:
+            lines.append(f"  ... ({remaining} more not shown)")
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
+
+def _pluralize(content_type: str, count: int) -> str:
+    label = content_type.replace("_"," ")
+    if count == 1:
+        return label
+    return label + ("es" if label.endswith(("ch", "s")) else "s")
+
