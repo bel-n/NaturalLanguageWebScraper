@@ -21,7 +21,6 @@ def parse_html(html: str) -> DOMNode:
 
     return root
 
-
 def _convert_element(element: Tag) -> DOMNode:
     """
     Convert one BeautifulSoup Tag into a DOMNode and recursively
