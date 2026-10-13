@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from datetime import date
 from typing import Optional
 
@@ -40,3 +40,16 @@ class ScrapeIntent:
             parts.append(f"fields={self.fields!r}")
         parts.append(f"output_format={self.output_format!r}")
         return f"ScrapeIntent({', '.join(parts)})"
+
+    def to_dict(self) -> dict:
+        data = asdict(self)
+        data["date_filter"] = self.date_filter.isoformat() if self.date_filter else None
+        return data
+    @classmethod
+    def from_dict(cls, data: dict) -> "ScrapeIntent":
+        data = dict(data)  
+        raw_date = data.get("date_filter")
+        data["date_filter"] = date.fromisoformat(raw_date) if raw_date else None
+        return cls(**data)
+
+
