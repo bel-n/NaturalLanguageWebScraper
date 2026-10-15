@@ -59,6 +59,11 @@ def _fetch_cached(url: str) -> str:
         return html
 
 
+#we have to dwnld the page and remember it for later
+def load_page(url:str) -> str:
+    return _fetch_cached(url)
+
+
     #now we have to understand the intent and show a preview
 def build_intent(description: str) -> ScrapeIntent:
     return parse_intent(description)
