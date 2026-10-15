@@ -1,18 +1,10 @@
-from src.analyzer.group_finder import find_candidate_groups, find_group_by_signature, group_signature
-from src.analyzer.scorer import filter_items, rank_groups
-from src.extractor import extract_by_selectors, extract_fields
+import requests
+
+from src import service
+from src.dom_preview import format_preview
 from src.exporter import export
-from src.fetcher import fetch_page
 from src.intent import ScrapeIntent
 from src.intent_builder import KNOWN_FIELDS, build_intent_interactively
-from src.intent_parser import parse_intent
-from src.navigator import find_category_link
-from src.paginator import find_next_link
-from src.parser import parse_html
-from src.dom_preview import find_matches_by_content_type, format_preview
-
-MAX_PAGES = 20  # safety cap so a bad "next" match can't crawl forever
-PREVIEW_SIZE = 3
 
 
 def main() -> None:
@@ -22,16 +14,20 @@ def main() -> None:
         return
 
     print("\nFetching webpage...")
-    html = fetch_page(url)
+    try:
+        service.load_page(url)
+    except requests.RequestException as error:
+        print(f"Couldn't download that page: {error}")
+        return
 
     knows_selectors = input(
         "\nDo you know the CSS selectors for what you need? (y/n): "
     ).strip().lower()
 
     if knows_selectors == "y":
-        results, fmt = _run_selector_path(html)
+        results, fmt = _run_selector_path(url)
     else:
-        results, fmt = _run_intent_path(html, url)
+        results, fmt = _run_intent_path(url)
 
     if not results:
         print("\nNo matching items found.")
@@ -41,7 +37,7 @@ def main() -> None:
     print(f"\nExtracted {len(results)} item(s) -> {out_path}")
 
 
-def _run_selector_path(html: str) -> tuple[list[dict], str]:
+def _run_selector_path(url: str) -> tuple[list[dict], str]:
     print(
         "\nEnter field:selector pairs, one per line "
         "(e.g. 'title:.article h2'). Blank line to finish."
@@ -58,34 +54,40 @@ def _run_selector_path(html: str) -> tuple[list[dict], str]:
         selector_map[field.strip()] = selector.strip()
 
     fmt = input("Output format (csv/json) [json]: ").strip().lower() or "json"
-    results = extract_by_selectors(html, selector_map)
+
+    try:
+        results = service.extract_with_selectors(url, selector_map)
+    except ValueError as error:   # the selectors matched different numbers of items
+        print(f"\n{error}")
+        return [], fmt
     return results, fmt
 
 
-def _run_intent_path(html: str, url: str) -> tuple[list[dict], str]:
+def _run_intent_path(url: str) -> tuple[list[dict], str]:
     intent = _build_intent()
     print(f"\nStarting with: {intent}")
 
     while True:
-        page_html, page_url = _navigate_to_category(html, url, intent)
-        root = parse_html(page_html)
+        preview = service.prepare_preview(url, intent)
 
-        if not _dom_content_preview_and_confirm(root, intent):
-            refined = _refine_intent_from_feedback(intent)
-            if refined is None:
+        for note in preview.notes:
+            print(note)
+
+        print()
+        print(format_preview(preview.dom_matches))
+        print()
+
+        if input("Does this look like what you need? (y/n):").strip().lower() != "y":
+            feedback = input(
+                "\nWhat's missing or wrong? Describe it in a sentence (blank to give up): "
+            ).strip()
+            if not feedback:
                 return [], intent.output_format
-            intent = refined
-            continue  # re-navigate with the refined intent — it might change which page we land on
+            intent = service.refine_intent(intent, feedback)
+            continue  # preview again with the refined intent
 
-        groups = find_candidate_groups(root)
-        ranked = rank_groups(groups, intent)
-
-        if not ranked:
-            print("No repeating content found on this page.")
-            return [], intent.output_format
-
-        confirmed = _preview_and_confirm(ranked, intent)
-        if confirmed is not None:
+        chosen = _choose_candidate(preview)
+        if chosen is not None:
             break
 
         print("\nNone of the candidates looked right.")
@@ -93,13 +95,7 @@ def _run_intent_path(html: str, url: str) -> tuple[list[dict], str]:
             return [], intent.output_format
         intent = _adjust_intent(intent)
 
-    all_items = filter_items(confirmed, intent)
-    all_items = _follow_pagination(page_html, page_url, confirmed, intent, all_items)
-
-    if intent.limit:
-        all_items = all_items[: intent.limit]
-
-    results = [extract_fields(item, intent.fields) for item in all_items]
+    results = service.run_extraction(preview.page_url, intent, chosen.index)
     return results, intent.output_format
 
 
@@ -118,108 +114,21 @@ def _build_intent() -> ScrapeIntent:
         "\nDescribe what you want "
         "(e.g. 'last 5 news from yesterday mentioning catastrophe, titles only'): "
     ).strip()
-    return parse_intent(query)
+    return service.build_intent(query)
 
 
-def _navigate_to_category(html: str, url: str, intent: ScrapeIntent) -> tuple[str, str]:
-    if not intent.category:
-        return html, url
-
-    target_url = find_category_link(html, url, intent.category)
-    if not target_url:
-        print(
-            f"Couldn't find a '{intent.category}' link on this page — "
-            "scraping the page as given instead."
-        )
-        return html, url
-
-    print(f"Found a '{intent.category}' section — visiting {target_url}")
-    return fetch_page(target_url), target_url
-
-
-def _preview_and_confirm(ranked: list, intent: ScrapeIntent):
-
-
-    for i, candidate in enumerate(ranked, start=1):
-        preview_items = filter_items(candidate, intent)[:PREVIEW_SIZE]
-        if not preview_items:
-            continue  # this candidate has nothing matching the filters — skip silently
-
-        print(f"\nCandidate {i}/{len(ranked)} — preview of {min(PREVIEW_SIZE, len(preview_items))} item(s):")
-        for item in preview_items:
-            print(" ", extract_fields(item, intent.fields))
+def _choose_candidate(preview: service.PreviewResult):
+    """Show each candidate list in turn until the user says one looks right."""
+    total = len(preview.candidates)
+    for position, candidate in enumerate(preview.candidates, start=1):
+        print(f"\nCandidate {position}/{total} — preview of {len(candidate.items)} item(s):")
+        for item in candidate.items:
+            print(" ", item)
 
         if input("Does this look right? (y/n): ").strip().lower() == "y":
             return candidate
 
     return None
-
-def _dom_content_preview_and_confirm(root, intent) -> bool:
-    print()
-    print(format_preview(find_matches_by_content_type(root, intent)))
-    print()
-    return input("Does this look like what you need? (y/n):").strip().lower() == "y"
-
-def _refine_intent_from_feedback(intent):
-    feedback = input(
-        "\nWhat's missing or wrong? Describe it in a sentence (blank to give up): "
-    ).strip()
-    if not feedback:
-        return None
-
-    parsed = parse_intent(feedback)
-    for kw in parsed.keywords:
-        if kw not in intent.keywords:
-            intent.keywords.append(kw)
-    for f in parsed.fields:
-        if f not in intent.fields:
-            intent.fields.append(f)
-    if parsed.category:
-        intent.category = parsed.category
-    if parsed.location:
-        intent.location = parsed.location
-    if parsed.date_filter:
-        intent.date_filter = parsed.date_filter
-    if parsed.limit is not None:
-        intent.limit = parsed.limit
-    if parsed.target_type != "generic":
-        intent.target_type = parsed.target_type
-    if "csv" in feedback.lower() or "json" in feedback.lower():
-        intent.output_format = parsed.output_format
-
-    return intent
-
-
-def _follow_pagination(
-    start_html: str, start_url: str, confirmed_group: list, intent: ScrapeIntent, all_items: list,
-) -> list:
-    if intent.limit is not None and len(all_items) >= intent.limit:
-        return all_items
-
-    signature = group_signature(confirmed_group)
-    current_html, current_url = start_html, start_url
-
-    for _ in range(2, MAX_PAGES + 1):
-        next_url = find_next_link(current_html, current_url)
-        if not next_url:
-            break
-
-        print(f"{len(all_items)} matching so far — fetching next page...")
-        current_html = fetch_page(next_url)
-        current_url = next_url
-
-        root = parse_html(current_html)
-        groups = find_candidate_groups(root)
-        # Prefer the exact same list the user confirmed; only re-guess if
-        # this page's markup genuinely doesn't have that shape anymore.
-        match = find_group_by_signature(groups, signature)
-        if match:
-            all_items.extend(filter_items(match, intent))
-
-        if intent.limit is not None and len(all_items) >= intent.limit:
-            break
-
-    return all_items
 
 
 def _adjust_intent(intent: ScrapeIntent) -> ScrapeIntent:
