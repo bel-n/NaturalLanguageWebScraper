@@ -15,7 +15,7 @@ from src.paginator import find_next_link
 from src.parser import parse_html
 
 
-MAX_PAGES = 20
+MAX_PAGES = 3
 PREVIEW_SIZE = 3
 CACHE_SECONDS = 300
 CACHE_MAX_PAGES = 50 
