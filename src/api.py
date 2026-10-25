@@ -5,12 +5,15 @@ from urllib.parse import urlparse
 
 import requests
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from src import service
 from src.exporter import render
 from src.intent import ScrapeIntent
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 
 try:
@@ -22,6 +25,10 @@ except ImportError: #working on plai mode
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="Natural Language Web Scraper")
+
+@app.get("/")
+def serve_index():
+    return FileResponse("index.html")
 
 ShortText = Annotated[str, Field(max_length=100)]
 
