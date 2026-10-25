@@ -15,26 +15,28 @@ from src.paginator import find_next_link
 from src.parser import parse_html
 
 
-MAX_PAGES = 20  #so a bad next guess wont crawl forever
+MAX_PAGES = 20
 PREVIEW_SIZE = 3
 CACHE_SECONDS = 300
 CACHE_MAX_PAGES = 50 
 
 
-#part1 what will the service hand back to the web page or cli
+# ---------------------------------------------------------------------------
+# Result shapes: what the service hands back to the CLI or the web page
+# ---------------------------------------------------------------------------
 
 @dataclass
 class CandidatePreview:
-    index: int # position in the ranked list and then needed for run_extractor
-    items: list[dict] # as fields the first pulled items
+    index: int
+    items: list[dict]
 
 @dataclass
 class PreviewResult:
     intent: ScrapeIntent
     page_url: str
-    dom_matches: dict[str, list[PreviewMatch]] # what we have found
+    dom_matches: dict[str, list[PreviewMatch]]
     candidates: list[CandidatePreview]
-    notes: list[str] = field(default_factory=list) # messages that used to be print()
+    notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         data = asdict(self)
@@ -42,34 +44,48 @@ class PreviewResult:
         return data
 
 
-    #part2: page cache to bridge the gap between the review and the extraction
+# ---------------------------------------------------------------------------
+# Page cache: a page we just downloaded is reused for a few minutes
+# ---------------------------------------------------------------------------
+
 _page_cache: dict[str, tuple[float, str]] = {}
+
 
 def _fetch_cached(url: str) -> str:
     now = time.time()
     hit = _page_cache.get(url)
     if hit is not None and now - hit[0] < CACHE_SECONDS:
-         return hit[1]
+        return hit[1]
+    
     html = fetch_page(url)
 
     if len(_page_cache) >= CACHE_MAX_PAGES:
         oldest = min(_page_cache, key=lambda u: _page_cache[u][0])
         del _page_cache[oldest]
-        _page_cache[url] = (now, html)
-        return html
+    _page_cache[url] = (now, html)
+    return html
 
 
-#we have to dwnld the page and remember it for later
-def load_page(url:str) -> str:
+def load_page(url: str) -> str:
+    """Download a page and remember it. The CLI calls this right after the URL
+    is typed, so a bad URL fails early, and the later steps reuse the cached copy."""
     return _fetch_cached(url)
 
 
-    #now we have to understand the intent and show a preview
+# ---------------------------------------------------------------------------
+# Step 1: understand the request and show a preview
+# ---------------------------------------------------------------------------
+
 def build_intent(description: str) -> ScrapeIntent:
+    """Turn the user's plain sentence into a ScrapeIntent."""
     return parse_intent(description)
 
+
 def _get_page(url: str, intent: ScrapeIntent, notes: list[str]) -> tuple[str, str]:
- 
+    """
+    Download the page. If the user asked for a category (like 'humor'),
+    follow the link to that section. Returns (html, url_we_ended_up_on).
+    """
     html = _fetch_cached(url)
     if not intent.category:
         return html, url
@@ -86,7 +102,11 @@ def _get_page(url: str, intent: ScrapeIntent, notes: list[str]) -> tuple[str, st
     return _fetch_cached(target_url), target_url
 
 
-def prepare_review(url: str, intent: ScrapeIntent) -> PreviewResult:
+def prepare_preview(url: str, intent: ScrapeIntent) -> PreviewResult:
+    """
+    Everything that happens before the user says "yes, that's right":
+    download, parse, show what's on the page, and guess which list they mean.
+    """
     notes: list[str] = []
     page_html, page_url = _get_page(url, intent, notes)
     root = parse_html(page_html)
@@ -101,7 +121,7 @@ def prepare_review(url: str, intent: ScrapeIntent) -> PreviewResult:
     for index, group in enumerate(ranked):
         sample = filter_items(group, intent)[:PREVIEW_SIZE]
         if not sample:
-            continue  # nothing in this list matches the request, so skip it
+            continue
         candidates.append(
             CandidatePreview(index, [extract_fields(item, intent.fields) for item in sample])
         )
@@ -112,15 +132,22 @@ def prepare_review(url: str, intent: ScrapeIntent) -> PreviewResult:
     return PreviewResult(intent, page_url, dom_matches, candidates, notes)
 
 
-#case for when the user says that the results are not what they want
+# ---------------------------------------------------------------------------
+# Step 2: the user said "that's wrong", so update the intent
+# ---------------------------------------------------------------------------
 
 def refine_intent(intent: ScrapeIntent, feedback: str) -> ScrapeIntent:
+    """
+    Merge what the user said into the existing intent.
+    Returns a new intent and leaves the old one untouched.
+    """
     feedback = feedback.strip()
     if not feedback:
         return intent
-    parsed = parse_intent(feedback)
 
+    parsed = parse_intent(feedback)
     merged = replace(intent, keywords=list(intent.keywords), fields=list(intent.fields))
+
     for kw in parsed.keywords:
         if kw not in merged.keywords:
             merged.keywords.append(kw)
@@ -143,10 +170,16 @@ def refine_intent(intent: ScrapeIntent, feedback: str) -> ScrapeIntent:
     return merged
 
 
-#after the user will confirm a candidate we have to do the full scrape
+# ---------------------------------------------------------------------------
+# Step 3: the user confirmed a candidate, so run the full scrape
+# ---------------------------------------------------------------------------
 
 def run_extraction(page_url: str, intent: ScrapeIntent, candidate_index: int) -> list[dict]:
-
+    """
+    page_url        : PreviewResult.page_url (the category was already followed)
+    intent          : must be the SAME intent the preview used
+    candidate_index : CandidatePreview.index of the list the user confirmed
+    """
     page_html = _fetch_cached(page_url)
     root = parse_html(page_html)
     ranked = rank_groups(find_candidate_groups(root), intent)
@@ -165,8 +198,6 @@ def run_extraction(page_url: str, intent: ScrapeIntent, candidate_index: int) ->
     return [extract_fields(item, intent.fields) for item in items]
 
 
-#just w/o print
-
 def _follow_pagination(
     start_html: str,
     start_url: str,
@@ -175,6 +206,7 @@ def _follow_pagination(
     all_items: list,
     max_pages: int = MAX_PAGES,
 ) -> list:
+    """Follow pagination links and collect more items."""
     from src.analyzer.group_finder import find_group_by_signature, group_signature
 
     if intent.limit is not None and len(all_items) >= intent.limit:
@@ -192,8 +224,6 @@ def _follow_pagination(
         current_url = next_url
 
         groups = find_candidate_groups(parse_html(current_html))
-        # Prefer the exact same list the user confirmed; skip the page if
-        # its markup doesn't have that shape any more.
         match = find_group_by_signature(groups, signature)
         if match:
             all_items.extend(filter_items(match, intent))
@@ -204,8 +234,8 @@ def _follow_pagination(
     return all_items
 
 
-#when the user knows the css selector
+
+
 def extract_with_selectors(url: str, selector_map: dict[str, str]) -> list[dict]:
+    """Skips all the guessing. The user names the selectors themselves."""
     return extract_by_selectors(_fetch_cached(url), selector_map)
-
-

@@ -55,7 +55,7 @@ class ExtractRequest(BaseModel):
     candidate_index: int = Field(ge=0)
 
 class ExportRequest(BaseModel):
-    items: list[dict] = Field(max_items=5000)
+    items: list[dict] = Field(max_length=5000)
     format: Literal["csv", "json"] ="json"
 
 
