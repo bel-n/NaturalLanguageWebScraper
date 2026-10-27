@@ -129,6 +129,12 @@ def _to_intent(model: IntentModel) -> ScrapeIntent:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
+@app.post("/api/test")
+def test():
+    return {"message": "test works"}
+
+
 @app.get("/")
 def serve_index():
     return FileResponse("index.html")
