@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import asdict, dataclass, field, replace
 
@@ -49,9 +50,11 @@ class PreviewResult:
 # ---------------------------------------------------------------------------
 
 _page_cache: dict[str, tuple[float, str]] = {}
+_cache_lock = threading.Lock()
 
 
 def _fetch_cached(url: str) -> str:
+   with _cache_lock: 
     now = time.time()
     hit = _page_cache.get(url)
     if hit is not None and now - hit[0] < CACHE_SECONDS:
@@ -59,16 +62,16 @@ def _fetch_cached(url: str) -> str:
     
     html = fetch_page(url)
 
-    if len(_page_cache) >= CACHE_MAX_PAGES:
-        oldest = min(_page_cache, key=lambda u: _page_cache[u][0])
-        del _page_cache[oldest]
-    _page_cache[url] = (now, html)
+    with _cache_lock:
+        if len(_page_cache) >= CACHE_MAX_PAGES:
+            oldest = min(_page_cache, key=lambda u: _page_cache[u][0])
+            del _page_cache[oldest]
+        _page_cache[url] = (now, html)
     return html
 
 
 def load_page(url: str) -> str:
-    """Download a page and remember it. The CLI calls this right after the URL
-    is typed, so a bad URL fails early, and the later steps reuse the cached copy."""
+
     return _fetch_cached(url)
 
 
