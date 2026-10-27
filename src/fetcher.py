@@ -5,17 +5,12 @@ USER_AGENT = "NaturalLanguageWebScraper/1.0"
 MIN_TEXT_LENGTH = 500  # if less visible than this it probs need js
 
 
-def fetch_page(url: str, mode: str = "auto") -> str:
-    """
-    mode:
-      "plain"  - requests only (fast, light)
-      "render" - real browser, runs JavaScript
-      "auto"   - try plain first, fall back to the browser if the page looks empty
-    """
+def fetch_page(url: str, mode: str = "plain") -> str:  # Changed from "auto"
     if mode == "render":
         return _fetch_rendered(url)
-
     html = _fetch_plain(url)
+    if mode == "plain": 
+        return html
     if mode == "auto" and _looks_empty(html):
         return _fetch_rendered(url)
     return html
