@@ -145,6 +145,7 @@ def health():
     return {"status": "ok"}
 
 
+""" 
 @app.post("/api/preview")
 #@limiter.limit("10/hour")
 def preview(req: PreviewRequest):
@@ -163,6 +164,13 @@ def preview(req: PreviewRequest):
     except DOWNLOAD_ERRORS as error:
         raise _download_failed(url, error) from None
     return result.to_dict()
+    """
+
+@app.post("/api/preview")
+def preview(req: PreviewRequest):
+    """Step 1: the URL plus either a sentence or an intent -> what we found."""
+    url = _check_url(req.url)
+    return {"debug": "URL validation passed", "url": url}
 
 
 @app.post("/api/refine")
