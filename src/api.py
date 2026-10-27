@@ -141,7 +141,7 @@ def health():
 
 @app.post("/api/preview")
 #@limiter.limit("10/hour")
-def preview(req: PreviewRequest, request: Request = None):
+def preview(req: PreviewRequest):
     """Step 1: the URL plus either a sentence or an intent -> what we found."""
     url = _check_url(req.url)
 
