@@ -167,9 +167,16 @@ def preview(req: PreviewRequest):
 
 @app.post("/api/preview")
 def preview(req: PreviewRequest):
-    """Step 1: the URL plus either a sentence or an intent -> what we found."""
     url = _check_url(req.url)
-    return {"debug": "URL validation passed", "url": url}
+    
+    if req.intent is not None:
+        intent = _to_intent(req.intent)
+    elif req.description and req.description.strip():
+        intent = service.build_intent(req.description)
+    else:
+        raise HTTPException(400, "Send either a description or an intent.")
+    
+    return {"debug": "Intent built", "intent": intent.to_dict()}
 
 
 @app.post("/api/refine")
