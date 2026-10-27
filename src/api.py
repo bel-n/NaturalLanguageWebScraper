@@ -145,11 +145,9 @@ def health():
     return {"status": "ok"}
 
 
-""" 
 @app.post("/api/preview")
-#@limiter.limit("10/hour")
 def preview(req: PreviewRequest):
-        url = _check_url(req.url)
+    url = _check_url(req.url)
 
     if req.intent is not None:
         intent = _to_intent(req.intent)
@@ -163,26 +161,6 @@ def preview(req: PreviewRequest):
     except DOWNLOAD_ERRORS as error:
         raise _download_failed(url, error) from None
     return result.to_dict()
-    """
-
-@app.post("/api/preview")
-def preview(req: PreviewRequest):
-    url = _check_url(req.url)
-    
-    if req.intent is not None:
-        intent = _to_intent(req.intent)
-    elif req.description and req.description.strip():
-        intent = service.build_intent(req.description)
-    else:
-        raise HTTPException(400, "Send either a description or an intent.")
-    
-    # Debug: try to fetch the page
-    try:
-        notes = []
-        page_html, page_url = service._get_page(url, intent, notes)
-        return {"debug": "Page fetched", "page_length": len(page_html), "notes": notes}
-    except Exception as e:
-        return {"debug": f"Error: {str(e)}"}
 
 @app.post("/api/refine")
 def refine(req: RefineRequest):
