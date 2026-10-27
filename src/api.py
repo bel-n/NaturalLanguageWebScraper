@@ -176,8 +176,13 @@ def preview(req: PreviewRequest):
     else:
         raise HTTPException(400, "Send either a description or an intent.")
     
-    return {"debug": "Intent built", "intent": intent.to_dict()}
-
+    # Debug: try to fetch the page
+    try:
+        notes = []
+        page_html, page_url = service._get_page(url, intent, notes)
+        return {"debug": "Page fetched", "page_length": len(page_html), "notes": notes}
+    except Exception as e:
+        return {"debug": f"Error: {str(e)}"}
 
 @app.post("/api/refine")
 def refine(req: RefineRequest):
