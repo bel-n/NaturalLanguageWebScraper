@@ -54,12 +54,12 @@ _cache_lock = threading.Lock()
 
 
 def _fetch_cached(url: str) -> str:
-   with _cache_lock: 
     now = time.time()
-    hit = _page_cache.get(url)
-    if hit is not None and now - hit[0] < CACHE_SECONDS:
-        return hit[1]
-    
+    with _cache_lock:
+        hit = _page_cache.get(url)
+        if hit is not None and now - hit[0] < CACHE_SECONDS:
+            return hit[1]
+
     html = fetch_page(url)
 
     with _cache_lock:

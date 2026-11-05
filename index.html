@@ -1,431 +1,433 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Natural Language Web Scraper</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f5f5f5;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        h1 {
-            margin-bottom: 30px;
-            color: #333;
-        }
-        .section {
-            margin-bottom: 30px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid #eee;
-        }
-        .section:last-child {
-            border-bottom: none;
-        }
-        h2 {
-            font-size: 18px;
-            margin-bottom: 15px;
-            color: #555;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #333;
-        }
-        input[type="text"], textarea {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 14px;
-        }
-        textarea {
-            resize: vertical;
-            min-height: 80px;
-        }
-        button {
-            padding: 10px 20px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        .loading {
-            display: none;
-            color: #666;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        .error {
-            background: #fee;
-            color: #c00;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            display: none;
-        }
-        .success {
-            background: #efe;
-            color: #060;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-            display: none;
-        }
-        .preview-section {
-            display: none;
-        }
-        .dom-matches {
-            background: #f9f9f9;
-            padding: 15px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-        .match-type {
-            margin-bottom: 15px;
-        }
-        .match-type-title {
-            font-weight: 500;
-            color: #555;
-            margin-bottom: 8px;
-        }
-        .match-item {
-            color: #666;
-            font-size: 13px;
-            margin-left: 20px;
-            margin-bottom: 5px;
-        }
-        .candidates {
-            margin-bottom: 20px;
-        }
-        .candidate {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            margin-bottom: 15px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .candidate:hover {
-            background: #f0f0f0;
-            border-color: #007bff;
-        }
-        .candidate.selected {
-            border-color: #007bff;
-            background: #e7f0ff;
-        }
-        .candidate-header {
-            font-weight: 500;
-            margin-bottom: 10px;
-            color: #333;
-        }
-        .candidate-items {
-            font-size: 13px;
-            color: #666;
-        }
-        .candidate-item {
-            margin-left: 20px;
-            margin-bottom: 5px;
-            padding: 5px;
-            background: white;
-            border-radius: 2px;
-        }
-        .results-section {
-            display: none;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        th {
-            background: #f5f5f5;
-            font-weight: 500;
-            color: #333;
-        }
-        tr:hover {
-            background: #f9f9f9;
-        }
-        .export-buttons {
-            display: flex;
-            gap: 10px;
-        }
-        .export-buttons button {
-            flex: 1;
-        }
-        .hidden {
-            display: none;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Natural Language Web Scraper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F6F1E7;
+    --card: #FFFDF8;
+    --ink: #14213D;
+    --terracotta: #E0703A;
+    --teal: #2A9D8F;
+    --muted: #6B6F7B;
+    --line: #D9CFBD;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Inter, system-ui, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 16px;
+    overflow-x: hidden;
+  }
+  header { text-align: center; margin-bottom: 32px; }
+  h1 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 800;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    margin: 0 0 6px;
+  }
+  .tag { color: var(--muted); margin: 0; }
+
+  /* Two panels share one grid cell, so they can swap places */
+  .stage { display: grid; width: 100%; max-width: 640px; }
+  .stage > * { grid-area: 1 / 1; }
+
+  .card {
+    background: var(--card);
+    border: 1.5px solid var(--ink);
+    border-radius: 14px;
+    box-shadow: 6px 6px 0 var(--terracotta);
+    padding: 28px 28px 24px;
+  }
+  .intake { transition: transform .7s cubic-bezier(.7, 0, .2, 1), opacity .5s; }
+  .intake.away {
+    transform: translateX(-115%) rotate(-7deg);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .results {
+    position: relative;
+    opacity: 0;
+    transform: translateX(40px);
+    transition: transform .7s cubic-bezier(.2, .8, .2, 1), opacity .6s;
+    pointer-events: none;
+  }
+  .results.in { opacity: 1; transform: none; pointer-events: auto; }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--teal);
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 18px;
+  }
+  input[type=url], input[type=text] {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    font: inherit;
+    font-size: 17px;
+    color: var(--ink);
+    background: transparent;
+    border: 0;
+    border-bottom: 1.5px solid var(--ink);
+    padding: 8px 0;
+    outline: none;
+  }
+  input:focus { border-bottom-color: var(--terracotta); }
+
+  .btn {
+    font: inherit;
+    font-weight: 600;
+    background: var(--terracotta);
+    color: #fff;
+    border: 1.5px solid var(--ink);
+    border-radius: 10px;
+    padding: 11px 18px;
+    box-shadow: 3px 3px 0 var(--ink);
+    cursor: pointer;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .row-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+
+  .flash { color: var(--terracotta); min-height: 1.4em; font-size: 14px; text-align: center; margin: 14px 0 0; }
+  .muted { color: var(--muted); }
+
+  /* Candidate lists */
+  .pick {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: var(--card);
+    cursor: pointer;
+    animation: rise .5s both;
+  }
+  .pick:has(input:checked) { border-color: var(--terracotta); box-shadow: 3px 3px 0 var(--terracotta); }
+  .pick input { margin-top: 4px; accent-color: var(--terracotta); }
+  .pick-body { font-size: 14px; }
+  .pick-body strong { display: block; margin-bottom: 4px; }
+  .sample { color: var(--muted); margin-top: 2px; }
+
+  /* Loading */
+  .dots { display: flex; gap: 8px; justify-content: center; padding: 40px 0 12px; }
+  .dots span {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--terracotta);
+    animation: bounce 1s infinite ease-in-out;
+  }
+  .dots span:nth-child(2) { animation-delay: .15s; background: var(--teal); }
+  .dots span:nth-child(3) { animation-delay: .3s; background: var(--ink); }
+
+  /* Results table */
+  .table-wrap {
+    overflow: auto;
+    max-height: 360px;
+    border: 1.5px solid var(--ink);
+    border-radius: 10px;
+    background: var(--card);
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th {
+    position: sticky; top: 0;
+    background: var(--ink); color: var(--paper);
+    text-align: left; padding: 8px 10px; font-weight: 600;
+  }
+  td { padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  .row-in { animation: rise .45s both; }
+
+  /* Saved stamp */
+  .stamp {
+    position: absolute; right: 24px; top: 24px;
+    border: 3px solid var(--teal); color: var(--teal);
+    font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 20px;
+    padding: 6px 14px; border-radius: 6px;
+    transform: rotate(-12deg) scale(2);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .stamp.show { animation: stampIn .6s cubic-bezier(.2, .9, .3, 1.2) forwards; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+  @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes stampIn { to { opacity: 1; transform: rotate(-12deg) scale(1); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 480px) {
+    .card { padding: 22px 18px 18px; }
+  }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1>Natural Language Web Scraper</h1>
 
-        <!-- Step 1: Input -->
-        <div class="section">
-            <h2>1. Enter a URL</h2>
-            <label>Website URL:</label>
-            <input type="text" id="url" placeholder="https://example.com" value="">
-            <div class="error" id="error"></div>
-        </div>
+<header>
+  <h1>Natural Language Web Scraper</h1>
+  <p class="tag">Describe the data. We find it.</p>
+</header>
 
-        <!-- Step 2: Describe what you want -->
-        <div class="section">
-            <h2>2. Describe what you want to scrape</h2>
-            <label>Description (e.g., "last 5 news articles about technology"):</label>
-            <textarea id="description" placeholder="Be specific about what you're looking for..."></textarea>
-            <button onclick="handlePreview()">Get Preview</button>
-            <div class="loading" id="previewLoading">Loading preview...</div>
-        </div>
+<main class="stage">
+  <section class="card intake" id="intake">
+    <p class="eyebrow">Scout a website</p>
+    <form id="scout" autocomplete="off">
+      <label>Website
+        <input id="url" type="url" placeholder="https://books.toscrape.com" required maxlength="2000">
+      </label>
+      <label>What do you want?
+        <input id="desc" type="text" placeholder="all book titles in the humor category" required maxlength="500">
+      </label>
+      <button class="btn" id="scout-btn" type="submit">Scout it &rarr;</button>
+    </form>
+  </section>
 
-        <!-- Step 3: Preview and choose -->
-        <div class="section preview-section" id="previewSection">
-            <h2>3. Preview - Found content</h2>
-            
-            <div class="dom-matches" id="domMatches"></div>
-
-            <h3 style="margin-bottom: 15px;">Choose which list looks right:</h3>
-            <div class="candidates" id="candidates"></div>
-
-            <button onclick="handleExtract()" id="extractButton" disabled>Extract Results</button>
-            <div class="loading" id="extractLoading">Running extraction...</div>
-        </div>
-
-        <!-- Step 4: Results -->
-        <div class="section results-section" id="resultsSection">
-            <h2>4. Results</h2>
-            <div id="resultsTable"></div>
-            <div class="export-buttons">
-                <button onclick="downloadCSV()">Download as CSV</button>
-                <button onclick="downloadJSON()">Download as JSON</button>
-            </div>
-            <button onclick="reset()" style="margin-top: 10px; background: #666;">Start Over</button>
-        </div>
+  <section class="results" id="results" aria-live="polite">
+    <div class="card" id="view-candidates">
+      <p class="eyebrow">Found these lists</p>
+      <div id="candidate-list"></div>
+      <div class="row-actions">
+        <button class="btn" id="extract" type="button">Extract this list</button>
+        <button class="btn ghost" id="restart" type="button">Start over</button>
+      </div>
     </div>
 
-    <script>
-        let currentPreview = null;
-        let currentResults = null;
-        let selectedCandidateIndex = null;
+    <div class="card" id="view-loading" hidden>
+      <div class="dots" aria-label="Loading"><span></span><span></span><span></span></div>
+      <p class="muted" style="text-align:center">Pulling the data from every page...</p>
+    </div>
 
-        function showError(msg) {
-            const el = document.getElementById('error');
-            el.textContent = msg;
-            el.style.display = 'block';
-        }
+    <div class="card" id="view-table" hidden>
+      <p class="eyebrow" id="count"></p>
+      <div class="table-wrap"><table id="data"></table></div>
+      <div class="row-actions">
+        <button class="btn" data-format="csv" type="button">Download CSV</button>
+        <button class="btn" data-format="json" type="button">Download JSON</button>
+        <button class="btn ghost" id="back" type="button">Pick another list</button>
+      </div>
+      <div class="stamp" id="stamp">Saved</div>
+    </div>
+  </section>
+</main>
 
-        function hideError() {
-            document.getElementById('error').style.display = 'none';
-        }
+<p class="flash" id="flash" role="alert"></p>
 
-        async function handlePreview() {
-            hideError();
-            const url = document.getElementById('url').value.trim();
-            const description = document.getElementById('description').value.trim();
+<script>
+const $ = (sel) => document.querySelector(sel);
+const intakeEl = $('#intake');
+const resultsEl = $('#results');
 
-            if (!url) {
-                showError('Please enter a URL');
-                return;
-            }
-            if (!description) {
-                showError('Please describe what you want to scrape');
-                return;
-            }
+let state = { intent: null, pageUrl: null, rows: [] };
 
-            document.getElementById('previewLoading').style.display = 'block';
-            try {
-                const response = await fetch('/api/preview', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({url, description})
-                });
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    showError(`Error: ${error.detail || 'Failed to preview'}`);
-                    return;
-                }
+function flash(msg) { $('#flash').textContent = msg; }
 
-                currentPreview = await response.json();
-                showPreview();
-            } catch (err) {
-                showError(`Network error: ${err.message}`);
-            } finally {
-                document.getElementById('previewLoading').style.display = 'none';
-            }
-        }
+function setView(name) {
+  for (const v of ['candidates', 'loading', 'table']) {
+    $('#view-' + v).hidden = v !== name;
+  }
+}
 
-        function showPreview() {
-            // Show DOM matches
-            const matchesDiv = document.getElementById('domMatches');
-            matchesDiv.innerHTML = '';
-            for (const [type, items] of Object.entries(currentPreview.dom_matches)) {
-                if (items.length === 0) continue;
-                const section = document.createElement('div');
-                section.className = 'match-type';
-                section.innerHTML = `<div class="match-type-title">${type}: ${items.length} found</div>`;
-                matchesDiv.appendChild(section);
-            }
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 429) throw new Error('Too many requests. Please wait a while and try again.');
+  let data = null;
+  try { data = await res.json(); } catch (_) { /* not JSON */ }
+  if (!res.ok) {
+    const detail = data && data.detail;
+    throw new Error(typeof detail === 'string' ? detail : 'Something went wrong. Check the link and try again.');
+  }
+  return data;
+}
 
-            // Show candidates
-            const candidatesDiv = document.getElementById('candidates');
-            candidatesDiv.innerHTML = '';
-            currentPreview.candidates.forEach(c => {
-                const div = document.createElement('div');
-                div.className = 'candidate';
-                div.onclick = () => selectCandidate(c.index, div);
-                let itemsHtml = c.items.map(item => {
-                    const summary = Object.entries(item).map(([k, v]) => `${k}: ${v}`).join(' | ');
-                    return `<div class="candidate-item">${summary}</div>`;
-                }).join('');
-                div.innerHTML = `
-                    <div class="candidate-header">Option ${c.index + 1} (${c.items.length} sample items)</div>
-                    <div class="candidate-items">${itemsHtml}</div>
-                `;
-                candidatesDiv.appendChild(div);
-            });
+function renderCandidates(candidates, notes) {
+  const list = $('#candidate-list');
+  list.replaceChildren();
 
-            document.getElementById('previewSection').style.display = 'block';
-            document.getElementById('resultsSection').style.display = 'none';
-        }
+  if (!candidates.length) {
+    list.append(el('p', 'muted', (notes && notes[0]) || 'Nothing matched. Try a different description.'));
+    $('#extract').hidden = true;
+    return;
+  }
+  $('#extract').hidden = false;
 
-        function selectCandidate(index, element) {
-            document.querySelectorAll('.candidate').forEach(c => c.classList.remove('selected'));
-            element.classList.add('selected');
-            selectedCandidateIndex = index;
-            document.getElementById('extractButton').disabled = false;
-        }
+  candidates.forEach((c, i) => {
+    const label = el('label', 'pick');
+    label.style.animationDelay = `${i * 90}ms`;
+    label.style.marginBottom = '10px';
 
-        async function handleExtract() {
-            if (selectedCandidateIndex === null) {
-                showError('Please select a candidate');
-                return;
-            }
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'candidate';
+    radio.value = c.index;
+    radio.checked = i === 0;
 
-            document.getElementById('extractLoading').style.display = 'block';
-            try {
-                const response = await fetch('/api/extract', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        page_url: currentPreview.page_url,
-                        intent: currentPreview.intent,
-                        candidate_index: selectedCandidateIndex
-                    })
-                });
+    const body = el('div', 'pick-body');
+    body.append(el('strong', '', `List ${c.index + 1}`));
+    for (const item of c.items.slice(0, 3)) {
+      const text = Object.values(item)
+        .filter((v) => v !== null && v !== '')
+        .map(String)
+        .join('  ·  ');
+      body.append(el('div', 'sample', text));
+    }
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    showError(`Error: ${error.detail || 'Failed to extract'}`);
-                    return;
-                }
+    label.append(radio, body);
+    list.append(label);
+  });
+}
 
-                const data = await response.json();
-                currentResults = data.results;
-                showResults();
-            } catch (err) {
-                showError(`Network error: ${err.message}`);
-            } finally {
-                document.getElementById('extractLoading').style.display = 'none';
-            }
-        }
+function renderTable(rows) {
+  $('#count').textContent = `${rows.length} ${rows.length === 1 ? 'row' : 'rows'} ready`;
+  const table = $('#data');
+  table.replaceChildren();
 
-        function showResults() {
-            if (!currentResults || currentResults.length === 0) {
-                showError('No results found');
-                return;
-            }
+  if (!rows.length) {
+    table.append(el('tr', '', 'No rows found.'));
+    return;
+  }
 
-            const tableDiv = document.getElementById('resultsTable');
-            const keys = Object.keys(currentResults[0]);
-            let html = '<table><tr>';
-            keys.forEach(k => html += `<th>${k}</th>`);
-            html += '</tr>';
-            currentResults.forEach(row => {
-                html += '<tr>';
-                keys.forEach(k => html += `<td>${row[k] || ''}</td>`);
-                html += '</tr>';
-            });
-            html += '</table>';
-            tableDiv.innerHTML = html;
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const thead = el('thead');
+  const headRow = el('tr');
+  cols.forEach((c) => headRow.append(el('th', '', c)));
+  thead.append(headRow);
 
-            document.getElementById('previewSection').style.display = 'none';
-            document.getElementById('resultsSection').style.display = 'block';
-        }
+  const tbody = el('tbody');
+  rows.forEach((r, i) => {
+    const tr = el('tr', 'row-in');
+    tr.style.animationDelay = `${Math.min(i, 30) * 45}ms`;
+    cols.forEach((c) => tr.append(el('td', '', r[c] == null ? '' : String(r[c]))));
+    tbody.append(tr);
+  });
 
-        async function downloadCSV() {
-            const response = await fetch('/api/export', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({items: currentResults, format: 'csv'})
-            });
-            const blob = await response.blob();
-            downloadBlob(blob, 'results.csv');
-        }
+  table.append(thead, tbody);
+}
 
-        async function downloadJSON() {
-            const response = await fetch('/api/export', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({items: currentResults, format: 'json'})
-            });
-            const blob = await response.blob();
-            downloadBlob(blob, 'results.json');
-        }
+function celebrate() {
+  const stamp = $('#stamp');
+  stamp.classList.remove('show');
+  void stamp.offsetWidth; // restart the animation
+  stamp.classList.add('show');
+}
 
-        function downloadBlob(blob, filename) {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            URL.revokeObjectURL(url);
-            document.body.removeChild(a);
-        }
+// Step 1: the business card
+$('#scout').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  flash('');
+  const btn = $('#scout-btn');
+  btn.disabled = true;
+  try {
+    const data = await api('/api/preview', {
+      url: $('#url').value.trim(),
+      description: $('#desc').value.trim(),
+    });
+    state.intent = data.intent;
+    state.pageUrl = data.page_url;
+    renderCandidates(data.candidates, data.notes);
+    setView('candidates');
+    intakeEl.classList.add('away');
+    resultsEl.classList.add('in');
+  } catch (err) {
+    flash(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
 
-        function reset() {
-            document.getElementById('url').value = '';
-            document.getElementById('description').value = '';
-            document.getElementById('previewSection').style.display = 'none';
-            document.getElementById('resultsSection').style.display = 'none';
-            selectedCandidateIndex = null;
-            currentPreview = null;
-            currentResults = null;
-            hideError();
-        }
-    </script>
+// Step 2: confirm a list and extract
+$('#extract').addEventListener('click', async () => {
+  const picked = document.querySelector('input[name=candidate]:checked');
+  if (!picked) return;
+  flash('');
+  setView('loading');
+  try {
+    const data = await api('/api/extract', {
+      page_url: state.pageUrl,
+      intent: state.intent,
+      candidate_index: Number(picked.value),
+    });
+    state.rows = data.results;
+    renderTable(data.results);
+    setView('table');
+  } catch (err) {
+    setView('candidates');
+    flash(err.message);
+  }
+});
+
+// Step 3: download
+async function download(format) {
+  flash('');
+  const res = await fetch('/api/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items: state.rows, format }),
+  });
+  if (!res.ok) {
+    flash('Could not create the file.');
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = el('a');
+  a.href = url;
+  a.download = `results.${format}`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  celebrate();
+}
+
+document.querySelectorAll('[data-format]').forEach((btn) => {
+  btn.addEventListener('click', () => download(btn.dataset.format));
+});
+
+$('#back').addEventListener('click', () => setView('candidates'));
+
+$('#restart').addEventListener('click', () => {
+  intakeEl.classList.remove('away');
+  resultsEl.classList.remove('in');
+  setView('candidates');
+  flash('');
+});
+</script>
 </body>
 </html>
